@@ -1,0 +1,378 @@
+<!--
+Improved prototype:
+- UI in Spanish, more colorful and polished.
+- Game A: "Juego A — Empareja y arrastra" (Match & Drag)
+- Game B: "Juego B — Mini Quiz" (timed multiple-choice with immediate feedback and Spanish explanations)
+- localStorage persists scores and stats; badges updated.
+- TTS for Spanish instructions included.
+- Single-file: index.html
+-->
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Practica "to be" — Juegos</title>
+<link rel="preconnect" href="https://fonts.gstatic.com">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700;800&display=swap');
+  :root{
+    --bg:#f0f7fb; --card:#ffffff; --muted:#475569;
+    --accent1:#0ea5a1; --accent2:#0369a1; --accent3:#7c3aed; --accent4:#fb7185;
+    --success:#10b981; --danger:#ef4444; --glass: rgba(255,255,255,0.6);
+  }
+  *{box-sizing:border-box}
+  body{font-family:Inter, system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; margin:0;
+       background:linear-gradient(180deg,#f8fbff 0%, #eef6ff 100%); color:#05204a; -webkit-font-smoothing:antialiased}
+  header{background:linear-gradient(90deg,var(--accent1),var(--accent3)); color:white; padding:18px 20px 22px 20px; border-bottom:4px solid rgba(255,255,255,0.06)}
+  header h1{margin:0;font-size:20px;letter-spacing:0.2px}
+  header p{margin:6px 0 0 0; opacity:0.95}
+  main{max-width:1100px;margin:20px auto;padding:18px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .card{background:var(--card);border-radius:14px;box-shadow:0 12px 30px rgba(10,20,40,0.06);padding:18px;margin-bottom:16px;border:1px solid rgba(2,6,23,0.03)}
+  .title{font-weight:800;color:#042a4d;margin-bottom:8px}
+  .muted{color:var(--muted);font-size:14px}
+  .nav{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+  .btn{background:#fff;border:1px solid rgba(2,6,23,0.06);padding:8px 12px;border-radius:10px;cursor:pointer;font-weight:700;box-shadow:0 6px 18px rgba(3,105,161,0.03)}
+  .btn.primary{background:linear-gradient(90deg,var(--accent2),var(--accent1));color:white;border:none}
+  .btn.ghost{background:transparent;border:1px solid rgba(3,105,161,0.08)}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .right{margin-left:auto}
+  .drop-row{display:flex;gap:12px;justify-content:center;margin-top:12px}
+  .drop-zone{min-width:140px;min-height:70px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+             padding:14px;background:linear-gradient(180deg,#ffffff,#f3fcff);text-align:center;flex-direction:column;border:2px dashed rgba(3,105,161,0.08)}
+  .drop-zone strong{font-size:18px;color:var(--accent2)}
+  .card-draggable{display:inline-block;padding:10px 14px;border-radius:12px;background:linear-gradient(180deg,#fff,#f8feff);cursor:grab;border:1px solid rgba(2,6,23,0.04);
+                  box-shadow:0 8px 26px rgba(3,105,161,0.06);font-weight:800;color:#0b2b3a}
+  .card-draggable.small{padding:8px 10px;font-size:14px}
+  .target.correct{border-color:var(--success);background:linear-gradient(180deg,#ecfdf5,#f0fdf4)}
+  .target.wrong{border-color:var(--danger);background:linear-gradient(180deg,#fff1f2,#fff5f5)}
+  .hint{background:linear-gradient(90deg,#fff,#f6fffb);padding:10px;border-radius:10px;border:1px solid rgba(3,105,161,0.06);font-weight:600;color:var(--accent2)}
+  .small{font-size:13px;color:var(--muted)}
+  .badge{display:inline-block;padding:8px 12px;border-radius:999px;font-weight:800;color:#fff;margin-left:6px}
+  .badge.gold{background:linear-gradient(90deg,#f59e0b,#f97316)}
+  .badge.silver{background:linear-gradient(90deg,#94a3b8,#64748b)}
+  .badge.bronze{background:linear-gradient(90deg,#c2410c,#fb923c)}
+  /* Quiz styles */
+  .question{font-weight:700;margin-top:8px;font-size:18px;color:#05204a}
+  .choices{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+  .choice{padding:12px;border-radius:10px;border:1px solid rgba(2,6,23,0.06);cursor:pointer;background:linear-gradient(180deg,#fff,#fbfdff);font-weight:700;display:flex;justify-content:space-between;align-items:center}
+  .choice.correct{border-color:var(--success);background:linear-gradient(90deg,#ecfdf5,#e6fbf1)}
+  .choice.wrong{border-color:var(--danger);background:linear-gradient(90deg,#fff1f2,#fff5f5)}
+  .explain{margin-top:10px;padding:12px;border-radius:10px;background:linear-gradient(180deg,#ffffff,#f7faff);border:1px solid rgba(3,105,161,0.04)}
+  footer{font-size:13px;text-align:center;color:var(--muted);padding:12px;margin-top:10px}
+  @media (max-width:900px){.grid{grid-template-columns:1fr}.right{margin-left:0}}
+</style>
+</head>
+<body>
+<header class="card">
+  <div style="display:flex;align-items:center;gap:12px">
+    <div style="flex:1">
+      <h1 style="margin:0">Práctica “to be” — presente simple</h1>
+      <p class="small" style="margin:6px 0 0 0">Interfaz en <strong>español</strong> para estudiantes hispanohablantes. Ejercicios en inglés.</p>
+    </div>
+    <div style="text-align:right">
+      <div class="small">Puntos totales: <strong id="global-score">0</strong></div>
+      <div class="small">Guardado local: <span id="storage-ind">sí</span></div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="grid">
+    <!-- Left: Juego A -->
+    <section class="card" aria-label="Juego A">
+      <div class="title">Juego A — Empareja y arrastra</div>
+      <div class="muted">Arrastra cada pronombre a <strong>am</strong>, <strong>is</strong> o <strong>are</strong>. En móvil: toca el pronombre y luego el objetivo.</div>
+      <div style="margin-top:12px" class="row">
+        <button id="start-match" class="btn primary">Iniciar</button>
+        <button id="pause-match" class="btn ghost" style="display:none">Pausar</button>
+        <button id="reset-match" class="btn">Reiniciar</button>
+        <div class="right small">Tiempo: <span id="match-timer">60</span>s — Puntos ronda: <strong id="match-score">0</strong></div>
+      </div>
+
+      <div style="margin-top:14px" class="drop-row" id="targets" aria-hidden="false"></div>
+
+      <div style="margin-top:16px">
+        <div class="muted">Tarjetas (pronombres)</div>
+        <div id="cards" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px" aria-live="polite"></div>
+      </div>
+
+      <div style="margin-top:12px" class="hint">Feedback: verde = correcto (+1). rojo = incorrecto (ver explicación rápida).</div>
+    </section>
+
+    <!-- Right: Juego B -->
+    <section class="card" aria-label="Juego B">
+      <div class="title">Juego B — Mini Quiz</div>
+      <div class="muted">Preguntas rápidas en inglés. Recibirás explicación en español si fallas.</div>
+      <div style="margin-top:12px" class="row">
+        <button id="start-quiz" class="btn primary">Iniciar Quiz</button>
+        <button id="next-quiz" class="btn" style="display:none">Siguiente</button>
+        <button id="reset-quiz" class="btn">Reiniciar Quiz</button>
+        <div class="right small">Pregunta: <span id="q-index">0</span>/<span id="q-total">0</span></div>
+      </div>
+
+      <div id="quiz-area" style="margin-top:12px;display:block">
+        <div id="quiz-timer-row" class="row small" style="margin-top:6px">Tiempo: <strong id="quiz-timer">12</strong>s</div>
+        <div id="quiz-question" class="question" aria-live="polite" style="margin-top:8px"></div>
+        <div id="quiz-choices" class="choices"></div>
+        <div id="quiz-explain" class="explain" style="display:none"></div>
+        <div style="margin-top:12px" class="small">Puntos quiz: <strong id="quiz-score">0</strong></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Bottom: Results and badges -->
+  <section class="card" style="margin-top:18px">
+    <div class="title">Resultados finales</div>
+    <div style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+      <div>
+        <div class="small">Total acumulado: <strong id="total-score">0</strong></div>
+        <ul style="margin-top:8px;color:#0b2b3a">
+          <li>Regla clave: I → am ; he/she/it → is ; you/we/they → are.</li>
+          <li>Ejemplo: They are students.</li>
+        </ul>
+      </div>
+      <div style="text-align:right">
+        <div id="badge-area"></div>
+        <div class="small" style="margin-top:6px">Precisión actual: <strong id="accuracy">0%</strong></div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="card small">
+    Opciones: puedo añadir sonidos, más preguntas, o subir esto a Replit con URL pública. ¿Quieres que lo haga?
+  </footer>
+</main>
+
+<script>
+/* ============================
+   Content: questions & pronouns
+   ============================ */
+const PRONOUNS = ['I','you','he','she','it','we','they'];
+
+const QUIZ_QUESTIONS = [
+  {q:"_____ you at home?", opts:['am','is','are'], a:2, explainES:"Se usa 'are' con 'you' (singular o plural). Ej.: You are at home."},
+  {q:"She _____ a teacher.", opts:['is','are','am'], a:0, explainES:"'is' se usa con 'she'."},
+  {q:"I _____ hungry.", opts:['is','am','are'], a:1, explainES:"'am' se usa únicamente con 'I'."},
+  {q:"They _____ soccer players.", opts:['is','are','am'], a:1, explainES:"'are' se usa con 'they'."},
+  {q:"It _____ cold today.", opts:['is','are','am'], a:0, explainES:"'it' + 'is' para el clima o cosas."},
+  {q:"_____ he your brother?", opts:['Are','Is','Am'], a:1, explainES:"En preguntas con 'he' usamos 'Is'. Estructura: Is + subject + ...?"},
+  {q:"We _____ ready.", opts:['is','are','am'], a:1, explainES:"'are' para 'we'."},
+  {q:"He _____ not here.", opts:['is','are','am'], a:0, explainES:"Negación: 'He is not here.' (He isn't here)."},
+  {q:"You _____ my friend.", opts:['is','are','am'], a:1, explainES:"'you' → 'are'."},
+  {q:"I _____ from Colombia.", opts:['am','is','are'], a:0, explainES:"'I am' para hablar de origen."}
+];
+
+const STORAGE_KEY = 'pronouns_pro_v3_state';
+let state = { globalScore:0, correct:0, attempts:0 };
+try{ const s=JSON.parse(localStorage.getItem(STORAGE_KEY)); if(s) state=Object.assign(state,s);}catch(e){console.warn(e)}
+
+/* Save & display */
+function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); updateTopDisplays(); }
+function updateTopDisplays(){
+  document.getElementById('global-score').textContent = state.globalScore;
+  document.getElementById('total-score').textContent = state.globalScore;
+  const acc = state.attempts ? Math.round(100*(state.correct/state.attempts)) : 0;
+  document.getElementById('accuracy').textContent = acc + '%';
+  updateBadges();
+}
+function updateBadges(){
+  const area = document.getElementById('badge-area'); area.innerHTML='';
+  const attempts = state.attempts||0, correct = state.correct||0;
+  const acc = attempts ? (correct/attempts) : 0;
+  let el=document.createElement('div');
+  if(acc>=0.85 && attempts>=5){ el.className='badge gold'; el.textContent='🏅 ORO'; }
+  else if(acc>=0.7 && attempts>=4){ el.className='badge silver'; el.textContent='🥈 PLATA'; }
+  else if(acc>=0.5 && attempts>=3){ el.className='badge bronze'; el.textContent='🥉 BRONCE'; }
+  else { el.className='small'; el.textContent='Sigue practicando para ganar medalla'; }
+  area.appendChild(el);
+}
+
+/* Reset button */
+document.getElementById('reset-match').addEventListener('click', ()=>{ if(confirm('Reiniciar juego A?')) initMatch(); });
+document.getElementById('reset-quiz').addEventListener('click', ()=>{ if(confirm('Reiniciar quiz?')) initQuiz(); });
+
+/* Init badges/displays */
+updateTopDisplays();
+
+/* ----------------- GAME A: Match & Drag ----------------- */
+let matchTimer=null, matchTimeLeft=60, matchScore=0, matchActive=false;
+
+function initMatch(){
+  // reset state for match
+  matchScore=0; matchTimeLeft=60; matchActive=false;
+  document.getElementById('match-score').textContent = matchScore;
+  document.getElementById('match-timer').textContent = matchTimeLeft;
+  const cardsDiv=document.getElementById('cards'), targetsDiv=document.getElementById('targets');
+  cardsDiv.innerHTML=''; targetsDiv.innerHTML='';
+  // create targets
+  ['am','is','are'].forEach(k => {
+    const t = document.createElement('div'); t.className='drop-zone target'; t.dataset.form=k;
+    t.innerHTML = '<strong>'+k+'</strong><div class="small" style="margin-top:6px;color:var(--muted)">suelta aquí</div>';
+    targetsDiv.appendChild(t);
+    t.addEventListener('dragover', e=>e.preventDefault());
+    t.addEventListener('drop', e=>{ e.preventDefault(); const id=e.dataTransfer.getData('text/plain'); const card=document.getElementById(id); if(card) handleMatchDrop(card,t); });
+  });
+  // create cards
+  const pool = shuffle(PRONOUNS.concat(PRONOUNS)).slice(0,12);
+  pool.forEach(p => {
+    const id = 'card_'+Math.random().toString(36).slice(2,8);
+    const d = document.createElement('div'); d.className='card-draggable'; d.draggable=true; d.id=id; d.dataset.pron=p; d.textContent=p;
+    d.addEventListener('dragstart', e=>{ e.dataTransfer.setData('text/plain', id); d.classList.add('dragging'); });
+    d.addEventListener('dragend', ()=>d.classList.remove('dragging'));
+    cardsDiv.appendChild(d);
+  });
+  // mobile fallback click-to-select
+  let selected=null;
+  cardsDiv.onclick = e=>{ const el=e.target.closest('.card-draggable'); if(!el) return; document.querySelectorAll('.card-draggable').forEach(c=>c.style.outline=''); selected=el; el.style.outline='3px solid rgba(14,165,161,0.12)'; };
+  document.getElementById('targets').onclick = e=>{ const tar = e.target.closest('.target'); if(!tar || !selected) return; handleMatchDrop(selected,tar); selected.style.outline=''; selected=null; };
+  updateMatchTimerDisplay();
+}
+
+function startMatch(){
+  if(matchActive) return;
+  matchActive=true; document.getElementById('start-match').textContent='En curso';
+  if(matchTimer) clearInterval(matchTimer);
+  matchTimeLeft=60; updateMatchTimerDisplay();
+  matchTimer = setInterval(()=>{
+    matchTimeLeft--; updateMatchTimerDisplay();
+    if(matchTimeLeft<=0){ clearInterval(matchTimer); finishMatch(); }
+  },1000);
+}
+
+function updateMatchTimerDisplay(){ document.getElementById('match-timer').textContent = matchTimeLeft; document.getElementById('match-score').textContent = matchScore; }
+
+function handleMatchDrop(card, target){
+  if(!matchActive) return;
+  const pron = card.dataset.pron; const form = target.dataset.form;
+  const lower = pron.toLowerCase();
+  const valid = (form==='am' && lower==='i') || (form==='is' && ['he','she','it'].includes(lower)) || (form==='are' && ['you','we','they'].includes(lower));
+  // visual
+  target.classList.remove('wrong','correct'); target.classList.add(valid?'correct':'wrong');
+  card.style.opacity='0.45'; card.style.pointerEvents='none';
+  // scoring & feedback
+  state.attempts = (state.attempts||0) + 1;
+  if(valid){ matchScore++; state.globalScore = (state.globalScore||0) + 1; state.correct = (state.correct||0) + 1; }
+  else { // show explanation in Spanish near the target
+    const msg = document.createElement('div'); msg.className='small'; msg.style.marginTop='8px'; msg.style.color='var(--danger)';
+    msg.textContent = "Incorrecto — " + pron + " → " + explainFormForPronoun(pron);
+    target.appendChild(msg);
+    setTimeout(()=>{ try{ target.removeChild(msg); }catch(e){} },1600);
+  }
+  saveState(); updateTopDisplays();
+  setTimeout(()=>target.classList.remove('wrong','correct'),800);
+}
+
+function finishMatch(){ matchActive=false; alert('Ronda finalizada — puntos en la ronda: ' + matchScore); showRoundSummary(matchScore); }
+
+function showRoundSummary(score){
+  let reinforce = score>=6 ? "Buen trabajo — identificaste muchos aciertos." : "Intenta de nuevo — recuerda: I → am ; he/she/it → is ; you/we/they → are.";
+  alert("Resumen: Puntos: " + score + "\n\n" + reinforce);
+}
+
+/* ----------------- GAME B: Mini Quiz ----------------- */
+let quizIndex=0, quizTimer=null, quizTimeLeft=12, quizScore=0, quizActive=false, quizOrder=[];
+
+function initQuiz(){
+  quizIndex=0; quizScore=0; quizActive=false; quizOrder = shuffle(Array.from({length:QUIZ_QUESTIONS.length}, (_,i)=>i));
+  document.getElementById('quiz-score').textContent = quizScore;
+  document.getElementById('q-total').textContent = QUIZ_QUESTIONS.length;
+  document.getElementById('q-index').textContent = 0;
+  document.getElementById('quiz-question').textContent = '';
+  document.getElementById('quiz-choices').innerHTML='';
+  document.getElementById('quiz-explain').style.display='none';
+  updateTopDisplays();
+}
+
+function startQuiz(){
+  if(quizActive) return;
+  quizActive=true; document.getElementById('start-quiz').style.display='none'; document.getElementById('next-quiz').style.display='none';
+  quizIndex=0; quizScore=0;
+  showQuizQuestion();
+}
+
+function showQuizQuestion(){
+  if(quizIndex>=quizOrder.length){ endQuiz(); return; }
+  const idx = quizOrder[quizIndex]; const item = QUIZ_QUESTIONS[idx];
+  document.getElementById('q-index').textContent = quizIndex+1;
+  document.getElementById('quiz-question').textContent = item.q;
+  const chDiv = document.getElementById('quiz-choices'); chDiv.innerHTML='';
+  item.opts.forEach((opt,i)=>{
+    const d = document.createElement('div'); d.className='choice'; d.tabIndex=0; d.textContent = opt;
+    d.addEventListener('click', ()=> selectChoice(i,d,item));
+    d.addEventListener('keydown', (e)=>{ if(e.key==='Enter') selectChoice(i,d,item); });
+    chDiv.appendChild(d);
+  });
+  // timer
+  quizTimeLeft=12; document.getElementById('quiz-timer').textContent = quizTimeLeft;
+  if(quizTimer) clearInterval(quizTimer);
+  quizTimer = setInterval(()=>{ quizTimeLeft--; document.getElementById('quiz-timer').textContent = quizTimeLeft; if(quizTimeLeft<=0){ clearInterval(quizTimer); lockQuizChoices(null,item); } },1000);
+}
+
+function selectChoice(i, element, item){
+  if(!quizActive) return;
+  const correctIndex = item.a;
+  document.querySelectorAll('.choice').forEach(c=> c.style.pointerEvents='none');
+  clearInterval(quizTimer);
+  state.attempts = (state.attempts||0) + 1;
+  if(i===correctIndex){
+    element.classList.add('correct'); quizScore++; state.correct = (state.correct||0) + 1; state.globalScore = (state.globalScore||0) + 1; document.getElementById('quiz-explain').style.display='block'; document.getElementById('quiz-explain').textContent = '¡Correcto! ' + item.explainES;
+  } else {
+    element.classList.add('wrong');
+    // highlight correct
+    const choices = Array.from(document.querySelectorAll('.choice')); if(choices[correctIndex]) choices[correctIndex].classList.add('correct');
+    document.getElementById('quiz-explain').style.display='block'; document.getElementById('quiz-explain').textContent = 'Respuesta correcta: ' + item.opts[correctIndex] + '. ' + item.explainES;
+  }
+  state.attempts = (state.attempts||0); // already incremented
+  state.globalScore = state.globalScore || 0;
+  saveState();
+  document.getElementById('quiz-score').textContent = quizScore;
+  document.getElementById('next-quiz').style.display='inline-block';
+  document.getElementById('start-quiz').style.display='none';
+}
+
+function lockQuizChoices(selected,item){ // timeout - show correct
+  document.querySelectorAll('.choice').forEach(c=> c.style.pointerEvents='none');
+  clearInterval(quizTimer);
+  const correctIndex = item.a;
+  const choices = Array.from(document.querySelectorAll('.choice')); if(choices[correctIndex]) choices[correctIndex].classList.add('correct');
+  document.getElementById('quiz-explain').style.display='block'; document.getElementById('quiz-explain').textContent = 'Tiempo acabado. Respuesta correcta: ' + item.opts[correctIndex] + '. ' + item.explainES;
+  state.attempts = (state.attempts||0) + 1;
+  saveState();
+  document.getElementById('next-quiz').style.display='inline-block';
+}
+
+document.getElementById('next-quiz').addEventListener('click', ()=>{ quizIndex++; document.getElementById('quiz-explain').style.display='none'; document.getElementById('next-quiz').style.display='none'; showQuizQuestion(); });
+
+function endQuiz(){
+  quizActive=false; clearInterval(quizTimer);
+  alert('Quiz terminado. Puntuación: ' + quizScore + ' / ' + QUIZ_QUESTIONS.length);
+  document.getElementById('start-quiz').style.display='inline-block'; document.getElementById('next-quiz').style.display='none';
+  saveState(); updateTopDisplays();
+}
+
+/* ----------------- Helpers ----------------- */
+function shuffle(arr){ return arr.slice().sort(()=>Math.random()-0.5); }
+function explainFormForPronoun(pron){
+  const p=pron.toLowerCase();
+  if(p==='i') return "I → usa 'am' (I am).";
+  if(['he','she','it'].includes(p)) return p + " → usa 'is' (he is, she is, it is).";
+  if(['you','we','they'].includes(p)) return p + " → usa 'are' (you are, we are, they are).";
+  return '';
+}
+
+/* ----------------- Init ----------------- */
+initMatch(); initQuiz(); updateTopDisplays();
+
+/* Event listeners */
+document.getElementById('start-match').addEventListener('click', ()=>{ startMatch(); });
+document.getElementById('start-quiz').addEventListener('click', ()=>{ startQuiz(); });
+document.getElementById('reset-quiz').addEventListener('click', initQuiz);
+
+/* Storage indicator */
+document.getElementById('storage-ind').textContent = (localStorage ? 'sí' : 'no');
+
+</script>
+</body>
+</html>
